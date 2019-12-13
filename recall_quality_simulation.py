@@ -38,6 +38,12 @@ sparsity = 0.25
 radiatum_inputs = 16
 oriens_inputs = 41000
 
+num_patterns = 1
+num_degradations = 100
+num_bins = 20
+degradation = 0.1
+bins = np.linspace(0, 1, num_bins + 1)
+
 # Network Topography
 # initialize with no connections
 connection_matrix = [[0 for ii in range(num_cells)] for ii in range(num_cells)]
@@ -90,11 +96,13 @@ for ii in range(num_input*num_cells):
         roll = np.random.uniform(0,1)
         interval = -mu*np.log(roll)
         
-        intervals.append(interval)
         elapsed_time += interval
         
         if elapsed_time > stim_length:
             flag = 0
+        else:
+            intervals.append(interval)
+            
 #            spikes = np.cumsum(intervals)[:-1]
 #            for spike in spikes:
 #                evecs[ii].append(spike)
@@ -102,14 +110,61 @@ for ii in range(num_input*num_cells):
 #        intervals = [1]
     
     rep_intervals = list(intervals)
+    last_interval = 0
     for j in range(num_reps - 1):
-        tmp_interval = rep_interval_delay
-        elapsed_time += tmp_interval
+        if len(intervals) == 0:
+            last_interval = last_interval - stim_length
+        else:
+            last_interval = intervals[-1]
+            tmp_interval = rep_interval_delay - last_interval
+            last_interval = 0
+            elapsed_time += tmp_interval
+    
+            for interval_copy in intervals:
+                elapsed_time += interval_copy + tmp_interval
+                rep_intervals.append(interval_copy + tmp_interval)
+                tmp_interval = 0
 
-        for interval_copy in intervals:
-            elapsed_time += interval_copy + tmp_interval
-            rep_intervals.append(interval_copy + tmp_interval)
-            tmp_interval = 0
+    
+    last_interval = intervals[-1]
+    for k in range(num_degradations):
+        if k == 0:
+           old_frequency = frequency
+        else:
+           old_frequency = degraded_frequency
+        degraded_frequency = old_frequency + random.normal(0, degradation)
+        while degraded_frequency < 0:
+            degraded_frequency = old_frequency + random.normal(0, degradation)
+
+        mu = 1000./frequency
+        elapsed_time = 0
+        flag = 1        
+        intervals = []
+
+        while flag:
+            roll = np.random.uniform(0,1)
+            interval = -mu*np.log(roll)
+            
+            elapsed_time += interval
+            
+            if elapsed_time > stim_length:
+                flag = 0
+            else:
+                intervals.append(interval)
+                
+        if len(intervals) == 0:
+            last_interval = last_interval - stim_length
+        else:
+            
+            tmp_interval = rep_interval_delay - last_interval
+            last_interval = 0
+            for interval_copy in intervals:
+                rep_intervals.append(interval_copy + tmp_interval)
+                tmp_interval = 0
+            last_interval = last_interval + intervals[-1]
+                
+            
+            
 
     spikes = np.cumsum(rep_intervals)[:-1]
     for spike in spikes:
@@ -118,26 +173,6 @@ for ii in range(num_input*num_cells):
     vecstims[ii].play(evecs[ii])
             
     spike_counts.append(len(spikes))
-
-#for ii in range(num_input):
-#    intervals = []
-#    mu = 1000./max_frequency # Convert to ms
-#    elapsed_time = 0
-#    flag = 1
-#    while flag:
-#        roll = np.random.uniform(0,1)
-#        interval = -mu*np.log(roll)
-#        
-#        intervals.append(interval)
-#        elapsed_time += interval
-#        
-#        if elapsed_time > tstop:
-#            flag = 0
-#            spikes = np.cumsum(intervals)[:-1]
-#            for spike in spikes:
-#                evecs[ii].append(spike)
-#            
-#            vecstims[ii].play(evecs[ii])
 
 #####################
 # Connecting inputs #
