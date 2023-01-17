@@ -1,4 +1,4 @@
-###################################################################
+    ###################################################################
 # 2019-05-08                                                      #
 # Code to test implementation of log-normal STDP synapse in a CA3 #
 # pyramidal cell                                                  #
@@ -31,6 +31,8 @@ fname_morph = 'output0_updated.swc'
 modeltype = 'Single'
 celltype = 'ca3pyramidalcell_Bakerb_network'
 
+random_input_period = 500
+
 num_input = 50
 num_cells = 50
 sparsity = 0.25
@@ -39,7 +41,7 @@ radiatum_inputs = 16
 oriens_inputs = 41000
 
 num_patterns = 1
-num_degradations = 100
+num_degradations = 10
 num_bins = 20
 degradation = 0.1
 bins = np.linspace(0, 1, num_bins + 1)
@@ -67,7 +69,7 @@ for ii in range(num_cells):
 ################################
 # Create spike times for input #
 ################################
-tstop = 1000 # unts: ms
+
 
 max_frequency = 5.5 # units: Hz
 min_frequency = 0.5
@@ -80,7 +82,16 @@ true_firing_rates = [0 for ii in range(num_input*num_cells)]
 # Rate Dependent Inputs
 stim_length = 50 # units: ms
 num_reps = 10
-rep_interval_delay = 50 # units: ms
+rep_interval_delay = 200 # units: ms
+
+#Constants
+num_patterns = 1
+num_degradations = 10
+num_bins = 20
+degradation = 0.1   
+bins = np.linspace(0, 1, num_bins + 1)
+
+tstop = random_input_period + (num_reps + num_degradations)*(stim_length + rep_interval_delay)# unts: ms
 
 stim_rates = []
 spike_counts = []
@@ -125,8 +136,10 @@ for ii in range(num_input*num_cells):
                 rep_intervals.append(interval_copy + tmp_interval)
                 tmp_interval = 0
 
-    
-    last_interval = intervals[-1]
+    if len(intervals) == 0:
+        last_interval = 0
+    else:
+        last_interval = intervals[-1]
     for k in range(num_degradations):
         if k == 0:
            old_frequency = frequency
@@ -307,16 +320,11 @@ h.run()
 ET = cookie.time()-ST
 print "Finished in %f seconds" % ET
 
-#Constants
-num_patterns = 1
-num_degradations = 100
-num_bins = 20
-degradation = 0.1
-bins = np.linspace(0, 1, num_bins + 1)
+
 
 training_reps = num_reps
 training_delay = rep_interval_delay
-combined_stim_time = training_reps*num_patterns*(stim_length+training_delay)
+combined_stim_time = (training_reps+num_degradations)*num_patterns*(stim_length+training_delay)
 weight_array = np.array(weight_changes)
 
 rep_response = []
@@ -336,7 +344,7 @@ for gg in range(training_reps):
         post_spikes = []
         v_array = np.array(v[ii])
         t2_array = np.array(t[ii])
-        for kk in range(int(last_rep_t), int(last_rep_t_end)):
+        for kk in range(int(last_rep_t), int(last_rep_t_end)-1):
             if v_array[kk] > 0 and v_array[kk] > v_array[kk+1] and v_array[kk] > v_array[kk-1]:
                 post_spikes.append(t2_array[kk])
 
@@ -406,17 +414,10 @@ retrieved_pattern = np.array(out_nc_spikes)
 degraded_input_pattern = [0]*num_cells
 
 # Sort correlations into bins
-j_offset = 0
+j_offset = num_reps
 for j in range(num_patterns):
    true_pattern = true_input_patterns
    for k in range(num_degradations):
-      if k == 0:
-         old_pattern = true_pattern
-      else:
-         old_pattern = degraded_input_pattern
-      for i in range(num_cells):
-         degraded_input_pattern[i] = old_pattern[i] + random.normal(0, degradation)
-         
       initial_cue_correlation, _ = pearsonr(true_pattern, degraded_input_pattern)
       final_state_correlation, _ = pearsonr(true_pattern, out_spike_rate[j_offset + j])
          

@@ -3,13 +3,33 @@ import numpy as np
 from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
 
+def generate_spike_times(frequency, stim_length):
+    intervals = []
+    mu = 1000./frequency
+    elapsed_time = 0
+    flag = 1
+    while flag:
+        roll = np.random.uniform(0, 1)
+        interval = -mu*np.log(roll)
+        elapsed_time += interval
+        
+        if elapsed_time > stim_length:
+            flag = 0
+        else:
+            intervals.append(interval)
+            
+    return list(intervals)
+
 # variables
 a = 0.01
-num_patterns = 10
-num_degradations = 100
+num_patterns = 1
+num_exposures = 10
+num_degradations = 10
 num_neurons = 50
 num_bins = 20     # bins for error bar groupings of correlations
-degredation = 0.1
+degradation = 0.1
+stim_length = 50
+stim_delay = 50
 
 bins = np.linspace(0,1, num_bins + 1)
 
@@ -29,14 +49,20 @@ input_pattern = [0]*num_neurons
 for j in range(num_patterns):
    for i in range(num_neurons):
       true_pattern[i] = random.random()
-      retrieved_pattern[i] = true_pattern[i] + random.gauss(0, 0.1)
+      retrieved_pattern[i] = -99
+      while retrieved_pattern[i] < 0:
+          retrieved_pattern[i] = true_pattern[i] + random.gauss(0, 0.1)
+
    for k in range(num_degradations):
       if k == 0:
          old_pattern = true_pattern
       else:
          old_pattern = input_pattern
       for i in range(num_neurons):
-         input_pattern[i] = old_pattern[i] + random.gauss(0, degredation)
+         input_pattern_tmp = -99
+         while input_pattern_tmp < 0:
+             input_pattern_tmp = old_pattern[i] + random.gauss(0, degradation)
+             input_pattern[i] = input_pattern_tmp
          b = random.random()
          retrieved_pattern[i] = (b*input_pattern[i] + (1-b)*true_pattern[i])/1 + random.gauss(0, 0.2)
 
@@ -66,7 +92,15 @@ for ii in range(num_bins):
       final_state_correlations_means.append(np.mean(final_state_correlations_binned[ii]))
       final_state_correlations_stddev.append(np.std(final_state_correlations_binned[ii]))
 
-
+frequency = 100
+stim_length = 50
+test = generate_spike_times(frequency, stim_length)
+spike_times = np.cumsum(test)[:-1]
+if len(spike_times) == 0:
+    leftover = stim_length
+else:
+    leftover = stim_length - spike_times[-1]
+print spike_times
 
 # Plot correlations
 fig = plt.figure()
